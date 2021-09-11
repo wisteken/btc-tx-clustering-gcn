@@ -1,2 +1,5 @@
+!/datasets/
+/datasets/*
+!/datasets/transactions/
+/datasets/transactions/*
 !.gitkeep
-/datasets/
