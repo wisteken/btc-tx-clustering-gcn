@@ -1,3 +1,9 @@
+# datasets directory
 !/datasets/
 /datasets/*
+
+# trained models directory
+!/models/
+/models/*
+
 !.gitkeep
