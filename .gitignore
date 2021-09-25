@@ -1,3 +1,4 @@
+__pycache__/
 /analysis/*
 
 # datasets directory
@@ -7,5 +8,9 @@
 # trained models directory
 !/models/
 /models/*
+
+# logs directory
+!/logs/
+/logs/*
 
 !.gitkeep
