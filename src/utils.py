@@ -1,6 +1,9 @@
-import torch
-from torch_geometric import data, loader
+from networkx.algorithms.traversal.depth_first_search import dfs_edges
+import numpy as np
 import pandas as pd
+import torch
+from torch.utils import data
+from torch_geometric.data import Data
 
 
 def load_data():
@@ -31,16 +34,41 @@ def load_data():
     df_edges['txId2'] = df_edges['txId2'].map(mapping_table)
     df_merged_features = df_merged_features.drop('txId', axis=1)
 
-    node_features = []
+    features = []
+    classes = []
+    edges = []
     for _, df_time_step_features in df_merged_features.groupby('time step'):
-        node_features.append(df_time_step_features.drop('time step', axis=1).values)
-    del df_merged_features
+        classes.append(df_time_step_features['class'])
+        features.append(df_time_step_features.drop(['time step', 'class'], axis=1))
+        edges.append(df_edges.loc[df_edges['txId1'].isin(df_time_step_features.index)])
+    del df_merged_features, df_edges
 
-    edge_index = df_edges.T.values
-    del df_edges
+    return features, edges, classes
 
-    return node_features, edge_index
+
+class EllipticDataset(data.Dataset):
+    def __init__(self, is_train=False):
+        self.is_train = is_train
+        self.features, self.edges, self.classes = load_data()
+
+    def __getitem__(self, index):
+        if (self.is_train):
+            ids = self.classes[index].loc[(self.classes[index] == 0) | (self.classes[index] == 1)].index
+            node_features = torch.tensor(self.features[index].iloc[ids].values, dtype=torch.double)
+            edge_index = torch.tensor(
+                self.edges[index].loc[(self.edges[index]['txId1'].isin(ids)) | (self.edges[index]['txId2'].isin(ids))].values, dtype=torch.long)
+            labels = torch.tensor(self.classes[index].iloc[ids].values, dtype=torch.long)
+            return Data(x=node_features, edge_index=edge_index, y=labels)
+        else:
+            node_features = torch.tensor(self.features[index].values, dtype=torch.double)
+            edge_index = torch.tensor(self.edges[index].values, dtype=torch.long)
+            labels = torch.tensor(self.classes[index].values, dtype=torch.long)
+            return Data(x=node_features, edge_index=edge_index, y=labels)
+
+    def __len__(self):
+        return len(self.classes)
 
 
 if __name__ == '__main__':
-    load_data()
+    datasets = EllipticDataset(is_train=True)
+    print(datasets[0])
