@@ -4,14 +4,13 @@ import argparse
 import configparser
 from sklearn.metrics import roc_auc_score
 
-from logger import logger
+from logger import Logger
 from utils import EllipticDataset
 from model import Classifier
 
-logger = logger(name='classification')
 config = configparser.ConfigParser()
 config.read('./config.ini')
-seed = config['TRAIN']['seed']
+seed = config['DEFAULT']['seed']
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 torch.manual_seed(seed)
 if device == 'cuda':
@@ -20,9 +19,12 @@ if device == 'cuda':
 
 
 def train():
+    # logger
+    logger = Logger(name='classification')
+
     # load config
-    th_timestep = int(config['TRAIN']['th_timestep'])
-    n_epochs = int(config['TRAIN']['n_epochs'])
+    th_timestep = int(config['CLASSIFIER']['th_timestep'])
+    n_epochs = int(config['CLASSIFIER']['n_epochs'])
 
     # load datasets
     datasets = EllipticDataset(is_train=True)
