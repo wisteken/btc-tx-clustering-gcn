@@ -1,6 +1,6 @@
 # bitcoin-tx-clustering-gcn
 
-## 1.Preparation
+## 1. Preparation
 
 First, please download the datasets from [Kaggle](https://www.kaggle.com/ellipticco/elliptic-data-set).
 

@@ -1,6 +1,8 @@
-import torch
-from torch_geometric import data, loader
+import numpy as np
 import pandas as pd
+import torch
+from torch.utils import data
+from torch_geometric.data import Data
 
 
 def load_data():
@@ -31,16 +33,46 @@ def load_data():
     df_edges['txId2'] = df_edges['txId2'].map(mapping_table)
     df_merged_features = df_merged_features.drop('txId', axis=1)
 
-    node_features = []
+    # split data by time step
+    features = []
+    classes = []
+    edges = []
     for _, df_time_step_features in df_merged_features.groupby('time step'):
-        node_features.append(df_time_step_features.drop('time step', axis=1).values)
-    del df_merged_features
+        classes.append(df_time_step_features['class'])
+        features.append(df_time_step_features.drop(['time step', 'class'], axis=1))
+        edges.append(df_edges.loc[df_edges['txId1'].isin(df_time_step_features.index)])
+    del df_merged_features, df_edges
 
-    edge_index = df_edges.T.values
-    del df_edges
-
-    return node_features, edge_index
+    return features, edges, classes
 
 
-if __name__ == '__main__':
-    load_data()
+class EllipticDataset(data.Dataset):
+    def __init__(self, is_train=False):
+        self.is_train = is_train
+        self.features, self.edges, self.classes = load_data()
+
+    def __getitem__(self, index):
+        if (self.is_train):
+            txIds = self.classes[index].loc[(self.classes[index] == 0) | (self.classes[index] == 1)].index
+            mapping_table = {txId: idx for idx, txId in enumerate(txIds)}
+            node_features = torch.tensor(self.features[index].loc[txIds].values, dtype=torch.double)
+            roi_edges = self.edges[index].loc[
+                (self.edges[index]['txId1'].isin(txIds)) & (self.edges[index]['txId2'].isin(txIds))].copy()
+            roi_edges['txId1'] = roi_edges['txId1'].map(mapping_table)
+            roi_edges['txId2'] = roi_edges['txId2'].map(mapping_table)
+            edge_index = torch.tensor(roi_edges.T.values, dtype=torch.long)
+            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.double)
+            return Data(x=node_features, edge_index=edge_index, y=labels)
+        else:
+            txIds = self.classes[index].index
+            mapping_table = {txId: idx for idx, txId in enumerate(txIds)}
+            node_features = torch.tensor(self.features[index].values, dtype=torch.double)
+            roi_edges = self.edges[index]
+            roi_edges['txId1'] = roi_edges['txId1'].map(mapping_table)
+            roi_edges['txId2'] = roi_edges['txId2'].map(mapping_table)
+            edge_index = torch.tensor(roi_edges.T.values, dtype=torch.long)
+            labels = torch.tensor(self.classes[index].values, dtype=torch.double)
+            return Data(x=node_features, edge_index=edge_index, y=labels)
+
+    def __len__(self):
+        return len(self.classes)
