@@ -15,4 +15,4 @@ class Classifier(torch.nn.Module):
         x = torch.dropout(x, p=0.1, train=self.training)
         x = self.conv2(x, edge_index)
 
-        return torch.sigmoid(x)
+        return torch.softmax(x, dim=1)

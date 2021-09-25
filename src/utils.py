@@ -47,12 +47,12 @@ def load_data():
 
 
 class EllipticDataset(data.Dataset):
-    def __init__(self, is_train=False):
-        self.is_train = is_train
+    def __init__(self, is_classification=False):
+        self.is_classification = is_classification
         self.features, self.edges, self.classes = load_data()
 
     def __getitem__(self, index):
-        if (self.is_train):
+        if (self.is_classification):
             txIds = self.classes[index].loc[(self.classes[index] == 0) | (self.classes[index] == 1)].index
             mapping_table = {txId: idx for idx, txId in enumerate(txIds)}
             node_features = torch.tensor(self.features[index].loc[txIds].values, dtype=torch.double)
@@ -61,7 +61,7 @@ class EllipticDataset(data.Dataset):
             roi_edges['txId1'] = roi_edges['txId1'].map(mapping_table)
             roi_edges['txId2'] = roi_edges['txId2'].map(mapping_table)
             edge_index = torch.tensor(roi_edges.T.values, dtype=torch.long)
-            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.double)
+            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.long)
             return Data(x=node_features, edge_index=edge_index, y=labels)
         else:
             txIds = self.classes[index].index
