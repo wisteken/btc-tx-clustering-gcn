@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import configparser
 import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_auc_score
 
 from logger import Logger
 from utils import EllipticDataset
@@ -20,7 +20,7 @@ if device == 'cuda':
     torch.backends.cudnn.deterministic = True
 
 n_features = 165
-n_classes = 2
+n_classes = 1
 
 
 def eval():
@@ -42,18 +42,18 @@ def eval():
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
     # eval model performance
-    accuracies = []
+    aucs = []
     for timestep in range(th_timestep):
         data = datasets[timestep].to(device)
         with torch.no_grad():
             _, out = model(data)
-            y_data = data.y.cpu().numpy()
+            y_data = data.y.detach().cpu().numpy()
             ids = np.where(y_data != 2)
-            y_pred = out.max(1)[1].cpu().numpy()
-            acc = accuracy_score(y_pred[ids], y_data[ids])
-            accuracies.append(acc)
-            logger.info(f'timestep {timestep + 1}/{th_timestep} | eval_acc: {acc: .3f}')
-    logger.info(f'average evaluation accuracy: {sum(accuracies)/len(accuracies): .3f}')
+            y_pred = out.reshape((data.x.shape[0])).detach().cpu().numpy()
+            auc = roc_auc_score(y_data[ids], y_pred[ids])
+            aucs.append(auc)
+            logger.info(f'timestep {timestep + 1}/{th_timestep} | eval_auc: {auc: .3f}')
+    logger.info(f'average evaluation roc_auc score: {sum(aucs)/len(aucs): .3f}')
 
 
 def run():
@@ -76,20 +76,24 @@ def run():
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
     # clustering txs
-    accuracies = []
+    aucs = []
     for timestep in range(th_timestep + 1, n_timestep):
         data = datasets[timestep].to(device)
         with torch.no_grad():
             embedded, out = model(data)
             y_data = data.y.cpu().numpy()
             ids = np.where(y_data != 2)
-            y_pred = out.max(1)[1].cpu().numpy()
-            acc = accuracy_score(y_pred[ids], y_data[ids])
-            accuracies.append(acc)
-            logger.info(f'timestep {timestep + 1}/{th_timestep} | accuracy: {acc: .3f}')
+            y_pred = out.cpu().numpy()
+            auc = roc_auc_score(y_data[ids], y_pred[ids])
+            aucs.append(auc)
+            logger.info(f'timestep {timestep + 1}/{th_timestep} | auc: {auc: .3f}')
 
-            plot(timestep, out.cpu().numpy(), y_data, True)
-    logger.info(f"average accuracy: {sum(accuracies)/len(accuracies): .3f}")
+            licit_ids = np.where(y_data == 0)
+            illicit_ids = np.where(y_data == 1)
+            unknown_ids = np.where(y_data == 2)
+            print(len(licit_ids[0]), len(illicit_ids[0]), len(unknown_ids[0]))
+            # plot(timestep, embedded.cpu().numpy(), y_data, True)
+    logger.info(f"average roc_auc score: {sum(aucs)/len(aucs): .3f}")
 
 
 def plot(timestep, x_embedded, y_data, is_limit=False):

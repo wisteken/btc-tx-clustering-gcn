@@ -61,7 +61,7 @@ class EllipticDataset(data.Dataset):
             roi_edges['txId1'] = roi_edges['txId1'].map(mapping_table)
             roi_edges['txId2'] = roi_edges['txId2'].map(mapping_table)
             edge_index = torch.tensor(roi_edges.T.values, dtype=torch.long)
-            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.long)
+            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.double)
             return Data(x=node_features, edge_index=edge_index, y=labels)
         else:
             txIds = self.classes[index].index

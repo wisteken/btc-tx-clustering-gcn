@@ -15,7 +15,7 @@ class ClassifierModel(torch.nn.Module):
         x = torch.dropout(x, p=0.1, train=self.training)
         x = self.conv2(x, edge_index)
 
-        return torch.softmax(x, dim=1)
+        return torch.sigmoid(x)
 
 
 class ClusteringModel(torch.nn.Module):
@@ -31,4 +31,4 @@ class ClusteringModel(torch.nn.Module):
         x = torch.dropout(x, p=0.1, train=self.training)
         x = self.conv2(x, edge_index)
 
-        return x, torch.softmax(x, dim=1)
+        return x, torch.sigmoid(x)
