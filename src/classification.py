@@ -1,13 +1,12 @@
 import os
-import sys
 import torch
 import argparse
 import configparser
-from sklearn.metrics import roc_auc_score, accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report
 
 from logger import Logger
 from utils import EllipticDataset
-from model import Classifier
+from model import ClassifierModel
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
@@ -34,9 +33,9 @@ def train():
     datasets = EllipticDataset(is_classification=True)
 
     # define model and parameters
-    model = Classifier(n_features, n_classes).to(device)
+    model = ClassifierModel(n_features, n_classes).to(device)
     model.double()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # , weight_decay=1e-5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     criterion = torch.nn.CrossEntropyLoss(weight=torch.DoubleTensor([0.7, 0.3]))
 
     # prepare validation data
@@ -68,7 +67,7 @@ def train():
             else:
                 logger.debug(f"epoch {epoch}/{n_epochs} | train_loss: {train_loss: .3f} train_acc: {train_acc}")
 
-    torch.save(model.state_dict(), "../models/classifier_weights.pth")
+    torch.save(model.state_dict(), '../models/classifier_weights.pth')
 
 
 def test():
@@ -85,8 +84,8 @@ def test():
     # load trained model
     trained_model_path = '../models/classifier_weights.pth'
     if not os.path.exists(path=trained_model_path):
-        raise FileNotFoundError('trained model is not found.')
-    model = Classifier(n_features, n_classes).to(device)
+        raise FileNotFoundError('Trained model is not found.')
+    model = ClassifierModel(n_features, n_classes).to(device)
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
     model.double()
     criterion = torch.nn.CrossEntropyLoss(weight=torch.DoubleTensor([0.7, 0.3]))
@@ -108,8 +107,8 @@ def test():
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="classification")
-    parser.add_argument('--test', action="store_true", help='is test mode')
+    parser = argparse.ArgumentParser(description='classification')
+    parser.add_argument('--test', action='store_true', help='is test mode')
     args = parser.parse_args()
     if args.test:
         test()
