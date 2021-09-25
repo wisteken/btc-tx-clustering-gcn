@@ -91,6 +91,7 @@ def test():
     model.double()
     criterion = torch.nn.CrossEntropyLoss(weight=torch.DoubleTensor([0.7, 0.3]))
 
+    # test model
     test_accuracies = []
     for timestep in range(th_timestep + 1, n_timestep):
         test_data = datasets[timestep].to(device)
@@ -102,7 +103,7 @@ def test():
             test_accuracies.append(test_acc)
         logger.info(f"timestep {timestep + 1}/{n_timestep} | test_loss: {test_loss: .3f} test_acc: {test_acc: .3f}")
         logger.debug(
-            f"{classification_report(test_data.y.detach().cpu(), test_out.max(1)[1].detach().cpu().numpy())}")
+            f"\n{classification_report(test_data.y.detach().cpu(), test_out.max(1)[1].detach().cpu().numpy())}")
     logger.info(f"average test accuracy: {sum(test_accuracies)/len(test_accuracies): .3f}")
 
 
