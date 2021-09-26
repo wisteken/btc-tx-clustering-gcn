@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_auc_score
 
 from logger import Logger
-from utils import EllipticDataset
-from model import ClusteringModel
+from utils import GraphDataset, TabularDatasets
+from model import GraphClassifier, MLPClassifier
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
@@ -23,21 +23,33 @@ n_features = 165
 n_classes = 1
 
 
-def eval():
+def eval(is_mlp=False):
     # logger
-    logger = Logger(name='eval_cls')
+    if is_mlp:
+        logger = Logger(name='eval_mlp_cls')
+    else:
+        logger = Logger(name='eval_gcn_cls')
 
     # load config
     th_timestep = int(config['CLUSTERING']['th_timestep'])
 
     # load datasets
-    datasets = EllipticDataset()
+    if is_mlp:
+        datasets = TabularDatasets()
+    else:
+        datasets = GraphDataset()
 
     # load trained model
-    trained_model_path = '../models/classifier_weights.pth'
-    if not os.path.exists(path=trained_model_path):
-        raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-    model = ClusteringModel(n_features, n_classes).to(device)
+    if is_mlp:
+        trained_model_path = '../models/mlp_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
+        model = MLPClassifier(n_features, n_classes).to(device)
+    else:
+        trained_model_path = '../models/gcn_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
+        model = GraphClassifier(n_features, n_classes).to(device)
     model.double()
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
@@ -56,22 +68,34 @@ def eval():
     logger.info(f'average evaluation roc_auc score: {sum(aucs)/len(aucs): .3f}')
 
 
-def run():
+def run(is_mlp=False):
     # logger
-    logger = Logger(name='run_cls')
+    if is_mlp:
+        logger = Logger(name='run_mlp_cls')
+    else:
+        logger = Logger(name='run_gcn_cls')
 
     # load config
     th_timestep = int(config['CLUSTERING']['th_timestep'])
 
     # load datasets
-    datasets = EllipticDataset()
+    if is_mlp:
+        datasets = TabularDatasets()
+    else:
+        datasets = GraphDataset()
     n_timestep = len(datasets)
 
     # load trained model
-    trained_model_path = '../models/classifier_weights.pth'
-    if not os.path.exists(path=trained_model_path):
-        raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-    model = ClusteringModel(n_features, n_classes).to(device)
+    if is_mlp:
+        trained_model_path = '../models/mlp_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
+        model = MLPClassifier(n_features, n_classes).to(device)
+    else:
+        trained_model_path = '../models/gcn_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
+        model = GraphClassifier(n_features, n_classes).to(device)
     model.double()
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
@@ -87,11 +111,6 @@ def run():
             auc = roc_auc_score(y_data[ids], y_pred[ids])
             aucs.append(auc)
             logger.info(f'timestep {timestep + 1}/{th_timestep} | auc: {auc: .3f}')
-
-            licit_ids = np.where(y_data == 0)
-            illicit_ids = np.where(y_data == 1)
-            unknown_ids = np.where(y_data == 2)
-            print(len(licit_ids[0]), len(illicit_ids[0]), len(unknown_ids[0]))
             # plot(timestep, embedded.cpu().numpy(), y_data, True)
     logger.info(f"average roc_auc score: {sum(aucs)/len(aucs): .3f}")
 
@@ -126,8 +145,9 @@ def plot(timestep, x_embedded, y_data, is_limit=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='clustering')
     parser.add_argument('--eval', action='store_true', help='is eval mode')
+    parser.add_argument('--mlp', action='store_true', help='is mlp mode')
     args = parser.parse_args()
     if args.eval:
-        eval()
+        eval(is_mlp=args.mlp)
     else:
-        run()
+        run(is_mlp=args.mlp)

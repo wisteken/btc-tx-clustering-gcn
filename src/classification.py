@@ -5,8 +5,8 @@ import configparser
 from sklearn.metrics import roc_auc_score
 
 from logger import Logger
-from utils import EllipticDataset
-from model import ClassifierModel
+from utils import GraphDataset, TabularDatasets
+from model import GraphClassifier, MLPClassifier
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
@@ -21,19 +21,28 @@ n_features = 165
 n_classes = 1
 
 
-def train():
+def train(is_mlp=False):
     # logger
-    logger = Logger(name='train_clf')
+    if is_mlp:
+        logger = Logger(name='train_mlp_clf')
+    else:
+        logger = Logger(name='train_gcn_clf')
 
     # load config
     th_timestep = int(config['CLASSIFIER']['th_timestep'])
     n_epochs = int(config['CLASSIFIER']['n_epochs'])
 
     # load datasets
-    datasets = EllipticDataset(is_classification=True)
+    if is_mlp:
+        datasets = TabularDatasets(is_clf=True)
+    else:
+        datasets = GraphDataset(is_clf=True)
 
     # define model and parameters
-    model = ClassifierModel(n_features, n_classes).to(device)
+    if is_mlp:
+        model = MLPClassifier(n_features, n_classes).to(device)
+    else:
+        model = GraphClassifier(n_features, n_classes).to(device)
     model.double()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-5)
     criterion = torch.nn.BCELoss()
@@ -49,7 +58,7 @@ def train():
         train_data = datasets[timestep].to(device)
         for epoch in range(1, n_epochs + 1):
             optimizer.zero_grad()
-            train_out = model(train_data)
+            _, train_out = model(train_data)
             train_out = train_out.reshape((train_data.x.shape[0]))
             train_loss = criterion(train_out, train_data.y)
             train_auc = roc_auc_score(train_data.y.detach().cpu().numpy(), train_out.detach().cpu().numpy())
@@ -58,7 +67,7 @@ def train():
 
             if epoch % 100 == 0:
                 with torch.no_grad():
-                    valid_out = model(valid_data)
+                    _, valid_out = model(valid_data)
                     valid_out = valid_out.reshape((valid_data.x.shape[0]))
                     valid_loss = criterion(valid_out, valid_data.y)
                     valid_auc = roc_auc_score(valid_data.y.detach().cpu().numpy(), valid_out.detach().cpu().numpy())
@@ -68,25 +77,40 @@ def train():
             else:
                 logger.debug(f"epoch {epoch}/{n_epochs} | train_loss: {train_loss: .3f} train_auc: {train_auc}")
 
-    torch.save(model.state_dict(), '../models/classifier_weights.pth')
+    if is_mlp:
+        torch.save(model.state_dict(), '../models/mlp_clf_weights.pth')
+    else:
+        torch.save(model.state_dict(), '../models/gcn_clf_weights.pth')
 
 
-def test():
+def test(is_mlp):
     # logger
-    logger = Logger(name='test_clf')
+    if is_mlp:
+        logger = Logger(name='test_mlp_clf')
+    else:
+        logger = Logger(name='test_gcn_clf')
 
     # load config
     th_timestep = int(config['CLASSIFIER']['th_timestep'])
 
     # load datasets
-    datasets = EllipticDataset(is_classification=True)
+    if is_mlp:
+        datasets = TabularDatasets(is_clf=True)
+    else:
+        datasets = GraphDataset(is_clf=True)
     n_timestep = len(datasets)
 
     # load trained model
-    trained_model_path = '../models/classifier_weights.pth'
-    if not os.path.exists(path=trained_model_path):
-        raise FileNotFoundError('Trained model is not found.')
-    model = ClassifierModel(n_features, n_classes).to(device)
+    if is_mlp:
+        trained_model_path = '../models/mlp_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found.')
+        model = MLPClassifier(n_features, n_classes).to(device)
+    else:
+        trained_model_path = '../models/gcn_clf_weights.pth'
+        if not os.path.exists(path=trained_model_path):
+            raise FileNotFoundError('Trained model is not found.')
+        model = GraphClassifier(n_features, n_classes).to(device)
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
     model.double()
     criterion = torch.nn.BCELoss()
@@ -97,7 +121,7 @@ def test():
         test_data = datasets[timestep].to(device)
 
         with torch.no_grad():
-            test_out = model(test_data)
+            _, test_out = model(test_data)
             test_out = test_out.reshape((test_data.x.shape[0]))
             test_loss = criterion(test_out, test_data.y)
             test_auc = roc_auc_score(test_data.y.detach().cpu(), test_out.detach().cpu().numpy())
@@ -109,8 +133,9 @@ def test():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='classification')
     parser.add_argument('--test', action='store_true', help='is test mode')
+    parser.add_argument('--mlp', action='store_true', help='is mlp mode')
     args = parser.parse_args()
     if args.test:
-        test()
+        test(is_mlp=args.mlp)
     else:
-        train()
+        train(is_mlp=args.mlp)
