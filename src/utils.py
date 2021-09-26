@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from types import SimpleNamespace
 import torch
 from torch.utils import data
 from torch_geometric.data import Data
@@ -46,13 +47,13 @@ def load_data():
     return features, edges, classes
 
 
-class EllipticDataset(data.Dataset):
-    def __init__(self, is_classification=False):
-        self.is_classification = is_classification
+class GraphDataset(data.Dataset):
+    def __init__(self, is_clf=False):
+        self.is_clf = is_clf
         self.features, self.edges, self.classes = load_data()
 
     def __getitem__(self, index):
-        if (self.is_classification):
+        if (self.is_clf):
             txIds = self.classes[index].loc[(self.classes[index] == 0) | (self.classes[index] == 1)].index
             mapping_table = {txId: idx for idx, txId in enumerate(txIds)}
             node_features = torch.tensor(self.features[index].loc[txIds].values, dtype=torch.double)
@@ -76,3 +77,34 @@ class EllipticDataset(data.Dataset):
 
     def __len__(self):
         return len(self.classes)
+
+
+class TabularDatasets(data.Dataset):
+    def __init__(self, is_clf=False):
+        self.is_clf = is_clf
+        self.features, _, self.classes = load_data()
+
+    def __getitem__(self, index):
+        if (self.is_clf):
+            txIds = self.classes[index].loc[(self.classes[index] == 0) | (self.classes[index] == 1)].index
+            node_features = torch.tensor(self.features[index].loc[txIds].values, dtype=torch.double)
+            labels = torch.tensor(self.classes[index].loc[txIds].values, dtype=torch.double)
+            return MockData(x=node_features, y=labels)
+        else:
+            node_features = torch.tensor(self.features[index].values, dtype=torch.double)
+            labels = torch.tensor(self.classes[index].values, dtype=torch.double)
+            return MockData(x=node_features, y=labels)
+
+    def __len__(self):
+        return len(self.classes)
+
+
+class MockData:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def to(self, device):
+        self.x = self.x.to(device)
+        self.y = self.y.to(device)
+        return self
