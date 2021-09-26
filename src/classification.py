@@ -13,9 +13,8 @@ config.read('./config.ini')
 seed = config['DEFAULT']['seed']
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 torch.manual_seed(seed)
-if device == 'cuda':
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic = True
 
 n_features = 165
 n_classes = 1

@@ -15,9 +15,8 @@ config.read('./config.ini')
 seed = config['DEFAULT']['seed']
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 torch.manual_seed(seed)
-if device == 'cuda':
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+torch.cuda.manual_seed_all(seed)
+torch.backends.cudnn.deterministic = True
 
 n_features = 165
 n_classes = 1
@@ -38,6 +37,7 @@ def eval(is_mlp=False):
         datasets = TabularDatasets()
     else:
         datasets = GraphDataset()
+    n_timestep = len(datasets)
 
     # load trained model
     if is_mlp:
@@ -64,7 +64,7 @@ def eval(is_mlp=False):
             y_pred = out.reshape((data.x.shape[0])).detach().cpu().numpy()
             auc = roc_auc_score(y_data[ids], y_pred[ids])
             aucs.append(auc)
-            logger.info(f'timestep {timestep + 1}/{th_timestep} | eval_auc: {auc: .3f}')
+            logger.info(f'timestep {timestep + 1}/{n_timestep} | eval_auc: {auc: .3f}')
     logger.info(f'average evaluation roc_auc score: {sum(aucs)/len(aucs): .3f}')
 
 
@@ -110,7 +110,7 @@ def run(is_mlp=False):
             y_pred = out.cpu().numpy()
             auc = roc_auc_score(y_data[ids], y_pred[ids])
             aucs.append(auc)
-            logger.info(f'timestep {timestep + 1}/{th_timestep} | auc: {auc: .3f}')
+            logger.info(f'timestep {timestep + 1}/{n_timestep} | auc: {auc: .3f}')
             # plot(timestep, embedded.cpu().numpy(), y_data, True)
     logger.info(f"average roc_auc score: {sum(aucs)/len(aucs): .3f}")
 

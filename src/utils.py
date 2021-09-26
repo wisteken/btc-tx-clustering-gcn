@@ -22,7 +22,7 @@ def load_data():
 
     # load classes
     df_classes = pd.read_csv(classes_csv_path)
-    df_classes['class'] = df_classes['class'].map({'unknown': 2, '1': 1, '2': 0})  # 1 for illicit tx, 0 for licit tx
+    df_classes['class'] = df_classes['class'].map({'unknown': 2, '1': 1, '2': 0})  # 0 for licit tx, 1 for illicit tx
 
     # marge classes into features
     df_merged_features = pd.merge(df_features, df_classes, how='left', right_on='txId', left_on='txId')
