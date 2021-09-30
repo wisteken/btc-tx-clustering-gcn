@@ -1,54 +1,28 @@
 import torch
-from torch import nn
-from torch_geometric.nn import GATConv
+from torch.nn import Linear
+from torch_geometric.nn import GCNConv
 
 
-class GraphClassifier(torch.nn.Module):
-    def __init__(self, n_features, n_classes, n_hidden1=128, n_hidden2=16):
-        super(GraphClassifier, self).__init__()
-        self.conv = GATConv(n_features, n_features)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.1)
-        self.fc1 = nn.Linear(2 * n_features, n_hidden1)
-        self.fc2 = nn.Linear(n_hidden1, n_hidden2)
-        self.fc3 = nn.Linear(n_hidden2, n_classes)
-        self.sigmoid = nn.Sigmoid()
+class Encoder(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels):
+        super().__init__()
+        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.conv_mu = GCNConv(hidden_channels, out_channels)
+        self.conv_logstd = GCNConv(hidden_channels, out_channels)
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        x_embedded = self.conv(x, edge_index)
-        x_e = self.relu(x_embedded)
-        x_e = self.dropout(x_e)
-        x = torch.cat((x, x_e), 1)
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.fc3(x)
-
-        return x_embedded, self.sigmoid(x)
+    def forward(self, x, edge_index):
+        x = self.conv1(x, edge_index).relu()
+        return self.conv_mu(x, edge_index), self.conv_logstd(x, edge_index)
 
 
-class MLPClassifier(torch.nn.Module):
-    def __init__(self, n_features, n_classes, n_hidden1=128, n_hidden2=16):
-        super(MLPClassifier, self).__init__()
-        self.fc1 = nn.Linear(n_features, n_hidden1)
-        self.fc2 = nn.Linear(n_hidden1, n_hidden2)
-        self.fc3 = nn.Linear(n_hidden2, n_classes)
-        self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(p=0.1)
-        self.sigmoid = nn.Sigmoid()
+class Discriminator(torch.nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels):
+        super().__init__()
+        self.lin1 = Linear(in_channels, hidden_channels)
+        self.lin2 = Linear(hidden_channels, hidden_channels)
+        self.lin3 = Linear(hidden_channels, out_channels)
 
-    def forward(self, data):
-        x = data.x
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.dropout(x)
-        x = self.fc3(x)
-
-        return x, self.sigmoid(x)
+    def forward(self, x):
+        x = self.lin1(x).relu()
+        x = self.lin2(x).relu()
+        return self.lin3(x)

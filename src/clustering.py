@@ -1,153 +1,104 @@
 import os
 import torch
+import random
 import argparse
 import numpy as np
 import configparser
+from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from torch_geometric.nn import ARGVA
+from torch_geometric.data import Data
 from sklearn.metrics import roc_auc_score
 
-from logger import Logger
-from utils import GraphDataset, TabularDatasets
-from model import GraphClassifier, MLPClassifier
+from utils import Logger, load_data
+from model import Encoder, Discriminator
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
 seed = config['DEFAULT']['seed']
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'cpu'
 torch.manual_seed(seed)
 torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
+random.seed(seed)
 
-n_features = 165
+n_features = 6
 n_classes = 1
 
 
-def eval(is_mlp=False):
+def train():
     # logger
-    if is_mlp:
-        logger = Logger(name='eval_mlp_cls')
-    else:
-        logger = Logger(name='eval_gcn_cls')
-
-    # load config
-    th_timestep = int(config['CLUSTERING']['th_timestep'])
+    # logger = Logger(name='train')
 
     # load datasets
-    if is_mlp:
-        datasets = TabularDatasets()
-    else:
-        datasets = GraphDataset()
-    n_timestep = len(datasets)
+    features, edges = load_data()
+    node_features = torch.tensor(features, dtype=torch.double, device=device)
+    edge_index = torch.tensor(edges, dtype=torch.long, device=device)
+    train_data = Data(x=node_features, edge_index=edge_index)
 
-    # load trained model
-    if is_mlp:
-        trained_model_path = '../models/mlp_clf_weights.pth'
-        if not os.path.exists(path=trained_model_path):
-            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-        model = MLPClassifier(n_features, n_classes).to(device)
-    else:
-        trained_model_path = '../models/gcn_clf_weights.pth'
-        if not os.path.exists(path=trained_model_path):
-            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-        model = GraphClassifier(n_features, n_classes).to(device)
+    # load model
+    encoder = Encoder(n_features, hidden_channels=32, out_channels=32)
+    discriminator = Discriminator(in_channels=32, hidden_channels=64, out_channels=32)
+    model = ARGVA(encoder, discriminator).to(device)
     model.double()
+
+    encoder_optimizer = torch.optim.Adam(encoder.parameters(), lr=0.005)
+    discriminator_optimizer = torch.optim.Adam(discriminator.parameters(), lr=0.001)
+
+    # train model
+    model.train()
+    n_epochs = 100
+    for epoch in range(n_epochs):
+        encoder_optimizer.zero_grad()
+        z = model.encode(train_data.x, train_data.edge_index)
+
+        # We optimize the discriminator more frequently than the encoder.
+        for i in range(10):
+            discriminator_optimizer.zero_grad()
+            discriminator_loss = model.discriminator_loss(z)
+            discriminator_loss.backward()
+            discriminator_optimizer.step()
+
+        loss = model.recon_loss(z, train_data.edge_index)
+        loss = loss + model.reg_loss(z)
+        loss = loss + (1 / train_data.num_nodes) * model.kl_loss()
+        loss.backward()
+        encoder_optimizer.step()
+        print(f'epoch: {epoch}/{n_epochs} loss: {loss}')
+        torch.save(model.state_dict(), f'../models/weights-{epoch}.pth')
+
+
+@torch.no_grad()
+def plot():
+    features, edges = load_data()
+    node_features = torch.tensor(features, dtype=torch.double, device=device)
+    edge_index = torch.tensor(edges, dtype=torch.long, device=device)
+    data = Data(x=node_features, edge_index=edge_index)
+
+    encoder = Encoder(n_features, hidden_channels=32, out_channels=32)
+    discriminator = Discriminator(in_channels=32, hidden_channels=64, out_channels=32)
+    model = ARGVA(encoder, discriminator).to(device)
+    model.double()
+    trained_model_path = '../models/weights.pth'
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
-    # eval model performance
-    aucs = []
-    for timestep in range(th_timestep):
-        data = datasets[timestep].to(device)
-        with torch.no_grad():
-            _, out = model(data)
-            y_data = data.y.detach().cpu().numpy()
-            ids = np.where(y_data != 2)
-            y_pred = out.reshape((data.x.shape[0])).detach().cpu().numpy()
-            auc = roc_auc_score(y_data[ids], y_pred[ids])
-            aucs.append(auc)
-            logger.info(f'timestep {timestep + 1}/{n_timestep} | eval_auc: {auc: .3f}')
-    logger.info(f'average evaluation roc_auc score: {sum(aucs)/len(aucs): .3f}')
+    model.eval()
+    z = model.encode(data.x, data.edge_index)
+    z = z.cpu().numpy()
+    z_selected = random.sample(list(range(z.shape[0])), 30000)
+    z_selected = TSNE(n_components=2).fit_transform(np.array(z_selected).reshape(-1, 1))
+    # y = data.y.cpu().numpy()
 
-
-def run(is_mlp=False):
-    # logger
-    if is_mlp:
-        logger = Logger(name='run_mlp_cls')
-    else:
-        logger = Logger(name='run_gcn_cls')
-
-    # load config
-    th_timestep = int(config['CLUSTERING']['th_timestep'])
-
-    # load datasets
-    if is_mlp:
-        datasets = TabularDatasets()
-    else:
-        datasets = GraphDataset()
-    n_timestep = len(datasets)
-
-    # load trained model
-    if is_mlp:
-        trained_model_path = '../models/mlp_clf_weights.pth'
-        if not os.path.exists(path=trained_model_path):
-            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-        model = MLPClassifier(n_features, n_classes).to(device)
-    else:
-        trained_model_path = '../models/gcn_clf_weights.pth'
-        if not os.path.exists(path=trained_model_path):
-            raise FileNotFoundError('Trained model is not found. Please execute train classifier before.')
-        model = GraphClassifier(n_features, n_classes).to(device)
-    model.double()
-    model.load_state_dict(torch.load(trained_model_path, map_location=device))
-
-    # clustering txs
-    aucs = []
-    for timestep in range(th_timestep + 1, n_timestep):
-        data = datasets[timestep].to(device)
-        with torch.no_grad():
-            embedded, out = model(data)
-            y_data = data.y.cpu().numpy()
-            ids = np.where(y_data != 2)
-            y_pred = out.cpu().numpy()
-            auc = roc_auc_score(y_data[ids], y_pred[ids])
-            aucs.append(auc)
-            logger.info(f'timestep {timestep + 1}/{n_timestep} | auc: {auc: .3f}')
-            # plot(timestep, embedded.cpu().numpy(), y_data, True)
-    logger.info(f"average roc_auc score: {sum(aucs)/len(aucs): .3f}")
-
-
-def plot(timestep, x_embedded, y_data, is_limit=False):
-    licit_ids = np.where(y_data == 0)
-    illicit_ids = np.where(y_data == 1)
-    unknown_ids = np.where(y_data == 2)
-    print(len(licit_ids[0]), len(illicit_ids[0]), len(unknown_ids[0]))
-    plt.figure(figsize=(15, 5))
-    plt.subplot(1, 3, 1)
-    plt.title('licit')
-    plt.scatter(x_embedded[licit_ids][:, 0:1], x_embedded[licit_ids][:, 1:2], c="blue", alpha=0.1)
-    if is_limit:
-        plt.xlim(-0.1, 1.1)
-        plt.ylim(-0.1, 1.1)
-    plt.subplot(1, 3, 2)
-    plt.title('illicit')
-    plt.scatter(x_embedded[illicit_ids][:, 0:1], x_embedded[illicit_ids][:, 1:2], c="red", alpha=0.1)
-    if is_limit:
-        plt.xlim(-0.1, 1.1)
-        plt.ylim(-0.1, 1.1)
-    plt.subplot(1, 3, 3)
-    plt.title('unknown')
-    plt.scatter(x_embedded[unknown_ids][:, 0:1], x_embedded[unknown_ids][:, 1:2], c="green", alpha=0.1)
-    if is_limit:
-        plt.xlim(-0.1, 1.1)
-        plt.ylim(-0.1, 1.1)
-    plt.savefig(f'../results/ts{timestep}_embedded.png', bbox_inches='tight')  # , transparent=True)):
+    plt.figure(figsize=(8, 8))
+    plt.scatter(z_selected[:, 0], z_selected[:, 1])
+    # for i in range(dataset.num_classes):
+    #     plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
+    plt.axis('off')
+    plt.savefig('../results/plot.png')
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='clustering')
-    parser.add_argument('--eval', action='store_true', help='is eval mode')
-    parser.add_argument('--mlp', action='store_true', help='is mlp mode')
-    args = parser.parse_args()
-    if args.eval:
-        eval(is_mlp=args.mlp)
-    else:
-        run(is_mlp=args.mlp)
+    # train()
+    plot()
