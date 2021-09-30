@@ -10,6 +10,7 @@ import pandas as pd
 from tqdm import tqdm
 from pytz import timezone
 from datetime import datetime
+from sklearn.preprocessing import MinMaxScaler
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
@@ -132,6 +133,16 @@ def preprocess_data():
     return node_features, edge_index
 
 
+def normalize_data():
+    features_path = '../datasets/bitcoin_2018/node_features.bin'
+    features = joblib.load(features_path)
+    node_features = features.copy()
+    for i in range(features.shape[1]):
+        scaler = MinMaxScaler()
+        node_features[:, i] = scaler.fit_transform(features[:, i].reshape(-1, 1)).reshape(-1)
+    joblib.dump(node_features, '../datasets/bitcoin_2018/node_features.bin')
+
+
 def load_data():
     # load node features
     features_path = '../datasets/bitcoin_2018/node_features.bin'
@@ -159,5 +170,6 @@ def export_to_csv():
 if __name__ == '__main__':
     # cropping_data()
     # node_features, edge_index = preprocess_data()
-    # features, edges = load_data()
+    # normalize_data()
     export_to_csv()
+    # features, edges = load_data()

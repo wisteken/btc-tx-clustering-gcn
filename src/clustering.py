@@ -7,6 +7,7 @@ import configparser
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from sklearn.cluster import KMeans
 from torch_geometric.nn import ARGVA
 from torch_geometric.data import Data
 from sklearn.metrics import roc_auc_score
@@ -16,7 +17,7 @@ from model import Encoder, Discriminator
 
 config = configparser.ConfigParser()
 config.read('./config.ini')
-seed = config['DEFAULT']['seed']
+seed = int(config['DEFAULT']['seed'])
 # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = 'cpu'
 torch.manual_seed(seed)
@@ -25,7 +26,7 @@ torch.backends.cudnn.deterministic = True
 random.seed(seed)
 
 n_features = 6
-n_classes = 1
+n_classes = 2
 
 
 def train():
@@ -66,8 +67,8 @@ def train():
         loss = loss + (1 / train_data.num_nodes) * model.kl_loss()
         loss.backward()
         encoder_optimizer.step()
-        print(f'epoch: {epoch}/{n_epochs} loss: {loss}')
-        torch.save(model.state_dict(), f'../models/weights-{epoch}.pth')
+        print(f'epoch: {epoch + 1}/{n_epochs} loss: {loss}')
+        torch.save(model.state_dict(), f'../models/weights-{epoch + 1}.pth')
 
 
 @torch.no_grad()
@@ -81,20 +82,25 @@ def plot():
     discriminator = Discriminator(in_channels=32, hidden_channels=64, out_channels=32)
     model = ARGVA(encoder, discriminator).to(device)
     model.double()
-    trained_model_path = '../models/weights.pth'
+    trained_model_path = '../models/weights-99.pth'
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
     model.eval()
     z = model.encode(data.x, data.edge_index)
     z = z.cpu().numpy()
-    z_selected = random.sample(list(range(z.shape[0])), 30000)
-    z_selected = TSNE(n_components=2).fit_transform(np.array(z_selected).reshape(-1, 1))
-    # y = data.y.cpu().numpy()
+    selected_idx = random.sample(list(range(z.shape[0])), 30000)
 
+    kmeans = KMeans(n_clusters=n_classes, random_state=seed).fit(z[selected_idx])
+    y_selected = kmeans.predict(z[selected_idx])
+
+    z_selected = TSNE(n_components=2, random_state=seed).fit_transform(z[selected_idx])
+
+    colors = [
+        '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535', '#ffd700'
+    ]
     plt.figure(figsize=(8, 8))
-    plt.scatter(z_selected[:, 0], z_selected[:, 1])
-    # for i in range(dataset.num_classes):
-    #     plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
+    for i in range(n_classes):
+        plt.scatter(z_selected[y_selected == i, 0], z_selected[y_selected == i, 1], s=20, color=colors[i])
     plt.axis('off')
     plt.savefig('../results/plot.png')
 
