@@ -1,3 +1,4 @@
+import os
 import sys
 import bisect
 import logging
@@ -10,6 +11,7 @@ import pandas as pd
 from tqdm import tqdm
 from pytz import timezone
 from datetime import datetime
+from collections import defaultdict
 from sklearn.preprocessing import MinMaxScaler
 
 config = configparser.ConfigParser()
@@ -135,17 +137,30 @@ def preprocess_data():
 
 def normalize_data():
     features_path = '../datasets/bitcoin_2018/node_features.bin'
+    if not os.path.exists(features_path):
+        preprocess_data()
+
     features = joblib.load(features_path)
     node_features = features.copy()
+
+    scalers = defaultdict(MinMaxScaler)
+    feature_names = ['n_inputs', 'n_outputs', 'input_seq_mean', 'in_sum_mean', 'output_seq_mean', 'out_sum_mean']
     for i in range(features.shape[1]):
-        scaler = MinMaxScaler()
-        node_features[:, i] = scaler.fit_transform(features[:, i].reshape(-1, 1)).reshape(-1)
-    joblib.dump(node_features, '../datasets/bitcoin_2018/node_features.bin')
+        node_features[:, i] = scalers[feature_names[i]].fit_transform(features[:, i].reshape(-1, 1)).reshape(-1)
+    joblib.dump(node_features, '../datasets/bitcoin_2018/normalized_node_features.bin')
+    joblib.dump(scalers, '../models/scalers.bin')
 
 
-def load_data():
+def load_data(is_normalized=True):
     # load node features
-    features_path = '../datasets/bitcoin_2018/node_features.bin'
+    if is_normalized:
+        features_path = '../datasets/bitcoin_2018/normalized_node_features.bin'
+        if not os.path.exists(features_path):
+            normalize_data()
+    else:
+        features_path = '../datasets/bitcoin_2018/node_features.bin'
+        if not os.path.exists(features_path):
+            preprocess_data()
     features = joblib.load(features_path)
 
     # load edge lists
@@ -157,7 +172,7 @@ def load_data():
 
 def export_to_csv():
     # load node features
-    features_path = '../datasets/bitcoin_2018/node_features.bin'
+    features_path = '../datasets/bitcoin_2018/normalized_node_features.bin'
     features = joblib.load(features_path)
     pd.DataFrame(features).to_csv('../datasets/bitcoin_2018/node_features.csv')
 
@@ -170,6 +185,6 @@ def export_to_csv():
 if __name__ == '__main__':
     # cropping_data()
     # node_features, edge_index = preprocess_data()
-    # normalize_data()
-    export_to_csv()
+    normalize_data()
+    # export_to_csv()
     # features, edges = load_data()

@@ -3,6 +3,7 @@ import torch
 import random
 import argparse
 import numpy as np
+import pandas as pd
 import configparser
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -31,7 +32,7 @@ n_classes = 2
 
 def train():
     # logger
-    # logger = Logger(name='train')
+    logger = Logger(name='train')
 
     # load datasets
     features, edges = load_data()
@@ -67,12 +68,12 @@ def train():
         loss = loss + (1 / train_data.num_nodes) * model.kl_loss()
         loss.backward()
         encoder_optimizer.step()
-        print(f'epoch: {epoch + 1}/{n_epochs} loss: {loss}')
+        logger.info(f'epoch: {epoch + 1}/{n_epochs} loss: {loss}')
         torch.save(model.state_dict(), f'../models/weights-{epoch + 1}.pth')
 
 
 @torch.no_grad()
-def plot():
+def test():
     features, edges = load_data()
     node_features = torch.tensor(features, dtype=torch.double, device=device)
     edge_index = torch.tensor(edges, dtype=torch.long, device=device)
@@ -90,21 +91,31 @@ def plot():
     z = z.cpu().numpy()
     selected_idx = random.sample(list(range(z.shape[0])), 30000)
 
-    kmeans = KMeans(n_clusters=n_classes, random_state=seed).fit(z[selected_idx])
-    y_selected = kmeans.predict(z[selected_idx])
+    kmeans = KMeans(n_clusters=n_classes, random_state=seed).fit(z)
+    y = kmeans.predict(z)
 
-    z_selected = TSNE(n_components=2, random_state=seed).fit_transform(z[selected_idx])
+    z_selected = z[selected_idx]
+    z_selected = TSNE(n_components=2, random_state=seed).fit_transform(z_selected)
 
     colors = [
-        '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535', '#ffd700'
+        '#bada55', '#008080', '#420420', '#7fe5f0', '#065535', '#ffd700', '#ffc0cb'
     ]
+    y_selected = y[selected_idx]
     plt.figure(figsize=(8, 8))
     for i in range(n_classes):
         plt.scatter(z_selected[y_selected == i, 0], z_selected[y_selected == i, 1], s=20, color=colors[i])
     plt.axis('off')
     plt.savefig('../results/plot.png')
 
+    x, _ = load_data(is_normalized=False)
+    pd.DataFrame(np.concatenate([x, y.reshape(-1, 1)], 1)).to_csv('../results/predicted.csv')
+
 
 if __name__ == '__main__':
-    # train()
-    plot()
+    parser = argparse.ArgumentParser(description='clustering')
+    parser.add_argument('--test', action='store_true', help='is test mode')
+    args = parser.parse_args()
+    if args.test:
+        test()
+    else:
+        train()
