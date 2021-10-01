@@ -180,11 +180,3 @@ def export_to_csv():
     edges_path = '../datasets/bitcoin_2018/edge_index.bin'
     edges = joblib.load(edges_path).reshape(2, -1)
     pd.DataFrame(edges).to_csv('../datasets/bitcoin_2018/edge_index.csv')
-
-
-if __name__ == '__main__':
-    # cropping_data()
-    # node_features, edge_index = preprocess_data()
-    normalize_data()
-    # export_to_csv()
-    # features, edges = load_data()
