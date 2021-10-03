@@ -25,7 +25,7 @@ torch.cuda.manual_seed_all(seed)
 torch.backends.cudnn.deterministic = True
 random.seed(seed)
 
-n_features = 6
+n_features = 10
 n_classes = 2
 
 
@@ -55,7 +55,6 @@ def train():
         encoder_optimizer.zero_grad()
         z = model.encode(train_data.x, train_data.edge_index)
 
-        # We optimize the discriminator more frequently than the encoder.
         for i in range(10):
             discriminator_optimizer.zero_grad()
             discriminator_loss = model.discriminator_loss(z)
@@ -82,7 +81,7 @@ def test():
     discriminator = Discriminator(in_channels=32, hidden_channels=64, out_channels=32)
     model = ARGVA(encoder, discriminator).to(device)
     model.double()
-    trained_model_path = '../models/weights-99.pth'
+    trained_model_path = '../models/weights-100.pth'
     model.load_state_dict(torch.load(trained_model_path, map_location=device))
 
     model.eval()
@@ -97,14 +96,14 @@ def test():
     z_selected = TSNE(n_components=2, random_state=seed).fit_transform(z_selected)
 
     colors = [
-        '#bada55', '#008080', '#420420', '#7fe5f0', '#065535', '#ffd700', '#ffc0cb'
+        '#bada55', '#008080', '#065535', '#ffd700', '#ffc0cb', '#420420', '#7fe5f0'
     ]
     y_selected = y[selected_idx]
     plt.figure(figsize=(8, 8))
     for i in range(n_classes):
         plt.scatter(z_selected[y_selected == i, 0], z_selected[y_selected == i, 1], s=20, color=colors[i])
     plt.axis('off')
-    plt.savefig('../results/plot.png')
+    plt.savefig('../results/plot.pdf', bbox_inches='tight', transparent=True)
 
     x, _ = load_data(is_normalized=False)
     pd.DataFrame(np.concatenate([x, y.reshape(-1, 1)], 1)).to_csv('../results/predicted.csv')

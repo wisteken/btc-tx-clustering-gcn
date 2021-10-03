@@ -96,37 +96,31 @@ def preprocess_data():
     df_txin = pd.read_csv(txin_path, index_col=0, header=0)
     for target_tx, gdf_txin in tqdm(df_txin.groupby('txID')):
         if mapping.get(target_tx, -1) != -1:
-            n_groups = len(gdf_txin)
-            input_seq_mean = 0
-            # prev_output_seq_mean = 0
-            in_sum_mean = 0
-            for idx in gdf_txin.index:
-                source_tx = gdf_txin.loc[idx, 'prev_txID']
-                if mapping.get(source_tx, -1) != -1:
-                    edges.append([mapping[source_tx], mapping[target_tx]])
-                input_seq_mean += gdf_txin.loc[idx, 'input_seq']
-                # prev_output_seq_mean += gdf_txin.loc[idx, 'prev_output_seq']
-                in_sum_mean += gdf_txin.loc[idx, 'sum']
-            df_tx.loc[mapping[target_tx], 'input_seq_mean'] = input_seq_mean / n_groups
-            # df_tx.loc[mapping[target_tx], 'prev_output_seq_mean'] = prev_output_seq_mean / n_groups / 10**3
-            df_tx.loc[mapping[target_tx], 'in_sum_mean'] = in_sum_mean / n_groups
+            prev_txIDs = gdf_txin['prev_txID']
+            edges += [
+                [mapping[prev_txIDs[idx]], mapping[target_tx]] for idx in gdf_txin.index if mapping.get(prev_txIDs[idx], -1) != -1
+            ]
+            df_tx.loc[mapping[target_tx], 'input_seq_mean'] = gdf_txin['input_seq'].mean()
+            df_tx.loc[mapping[target_tx], 'input_seq_std'] = gdf_txin['input_seq'].std()
+            df_tx.loc[mapping[target_tx], 'prev_output_seq_mean'] = gdf_txin['prev_output_seq'].mean()
+            df_tx.loc[mapping[target_tx], 'prev_output_seq_std'] = gdf_txin['prev_output_seq'].std()
+            df_tx.loc[mapping[target_tx], 'in_sum_mean'] = gdf_txin['sum'].mean()
+            df_tx.loc[mapping[target_tx], 'in_sum_std'] = gdf_txin['sum'].std()
 
     txout_path = '../datasets/bitcoin_2018/txout.csv'
     df_txout = pd.read_csv(txout_path, index_col=0, header=0)
     for target_tx, gdf_txout in tqdm(df_txout.groupby('txID')):
         if mapping.get(target_tx, -1) != -1:
-            n_groups = len(gdf_txout)
-            output_seq_mean = 0
-            out_sum_mean = 0
-            for idx in gdf_txout.index:
-                output_seq_mean += gdf_txout.loc[idx, 'output_seq']
-                out_sum_mean += gdf_txout.loc[idx, 'sum']
-            df_tx.loc[mapping[target_tx], 'output_seq_mean'] = output_seq_mean / n_groups
-            df_tx.loc[mapping[target_tx], 'out_sum_mean'] = out_sum_mean / n_groups
+            df_tx.loc[mapping[target_tx], 'output_seq_mean'] = gdf_txout['output_seq'].mean()
+            df_tx.loc[mapping[target_tx], 'output_seq_std'] = gdf_txout['output_seq'].std()
+            df_tx.loc[mapping[target_tx], 'out_sum_mean'] = gdf_txout['sum'].mean()
+            df_tx.loc[mapping[target_tx], 'out_sum_std'] = gdf_txout['sum'].std()
+
     edge_index = np.array(edges)
     df_tx = df_tx.fillna(0)
     node_features = df_tx[
-        ['n_inputs', 'n_outputs', 'input_seq_mean', 'in_sum_mean', 'output_seq_mean', 'out_sum_mean']
+        ['n_inputs', 'n_outputs', 'input_seq_mean', 'input_seq_std', 'in_sum_mean',
+            'in_sum_std', 'output_seq_mean', 'output_seq_std', 'out_sum_mean', 'out_sum_std']
     ].values
 
     joblib.dump(edge_index, '../datasets/bitcoin_2018/edge_index.bin')
@@ -144,7 +138,10 @@ def normalize_data():
     node_features = features.copy()
 
     scalers = defaultdict(MinMaxScaler)
-    feature_names = ['n_inputs', 'n_outputs', 'input_seq_mean', 'in_sum_mean', 'output_seq_mean', 'out_sum_mean']
+    feature_names = [
+        'n_inputs', 'n_outputs', 'input_seq_mean', 'input_seq_std', 'in_sum_mean',
+        'in_sum_std', 'output_seq_mean', 'output_seq_std', 'out_sum_mean', 'out_sum_std'
+    ]
     for i in range(features.shape[1]):
         node_features[:, i] = scalers[feature_names[i]].fit_transform(features[:, i].reshape(-1, 1)).reshape(-1)
     joblib.dump(node_features, '../datasets/bitcoin_2018/normalized_node_features.bin')
