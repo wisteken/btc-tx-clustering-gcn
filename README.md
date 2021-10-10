@@ -24,22 +24,25 @@ chmod +x ./script/extract.sh
 docker-compose up --build -d
 ```
 
-## 3. Train
+## 3. Dive into the container
+
+```shell
+docker-compose exec python bash
+cd src
+```
 
 - Train clustering model
 
 ```shell
-docker-compose exec python python3 src/clustering.py
+python3 clustering.py
 ```
-
-## 4. Test
 
 - Test clustering model
 
 ```shell
-docker-compose exec python python3 src/clustering.py --test
+python3 clustering.py --test
 ```
 
-## 5. Analyze results
+## 4. Analyze results
 
 Please check results and logs directory.
