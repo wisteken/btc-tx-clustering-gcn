@@ -1,3 +1,20 @@
+__pycache__/
+/analysis/*
+
+# datasets directory
 !/datasets/
 /datasets/*
+
+# trained models directory
+!/models/
+/models/*
+
+# logs directory
+!/logs/
+/logs/*
+
+# clustering results directory
+!/results/
+/results/*
+
 !.gitkeep
