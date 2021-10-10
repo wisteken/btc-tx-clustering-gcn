@@ -18,6 +18,9 @@ config = configparser.ConfigParser()
 config.read('./config.ini')
 seed = config['DEFAULT']['seed']
 
+if not os.path.exists('../datasets/bitcoin_2018'):
+    os.mkdir('../datasets/bitcoin_2018')
+
 
 class Logger:
     def __new__(cls, name: str = None, logdir: str = '../logs'):
@@ -51,7 +54,7 @@ def cropping_data():
     bh_df.loc[start_bid: end_bid].to_csv('../datasets/bitcoin_2018/bh.csv')
     del bh_df
 
-    tx_table_path = '../datasets/2018_tx/tx_eh'
+    tx_table_path = '../datasets/bitcoin_2018_tx.dat'
     tx_df = pd.read_table(tx_table_path, header=None, index_col=0)
     tx_df.columns = ['blockID', 'n_inputs', 'n_outputs']
     block_ids = tx_df['blockID'].values
@@ -62,7 +65,7 @@ def cropping_data():
     tx_df.loc[start_txid: end_txid].to_csv('../datasets/bitcoin_2018/tx.csv')
     del tx_df
 
-    txin_table_path = '../datasets/2018_txin/txineh'
+    txin_table_path = '../datasets/bitcoin_2018_txin.dat'
     txin_df = pd.read_table(txin_table_path, header=None)
     txin_df.columns = ['txID', 'input_seq', 'prev_txID', 'prev_output_seq', 'addrID', 'sum']
     tx_ids = txin_df['txID'].values
@@ -73,7 +76,7 @@ def cropping_data():
     txin_df.loc[start_txinid: end_txinid].to_csv('../datasets/bitcoin_2018/txin.csv')
     del txin_df
 
-    txout_table_path = '../datasets/2018_txout/xed'
+    txout_table_path = '../datasets/bitcoin_2018_txout.dat'
     txout_df = pd.read_table(txout_table_path, header=None)
     txout_df.columns = ['txID', 'output_seq', 'addrID', 'sum']
     tx_ids = txout_df['txID'].values

@@ -2,13 +2,16 @@
 
 ## 1. Preparation
 
-First, please download the datasets from [Kaggle](https://www.kaggle.com/ellipticco/elliptic-data-set).
-
-And, extract the downloaded file and put it in the datasets folder. Like follows.
+- Download the [datasets](https://doi.org/10.5061/dryad.qz612jmcf).
 
 ```shell
-─── datasets
-    ├── elliptic_txs_classes.csv
-    ├── elliptic_txs_edgelist.csv
-    └── elliptic_txs_features.csv
+chmod +x ./script/download.sh
+./script/download.sh
+```
+
+- Extract the downloaded data.
+
+```shell
+chmod +x ./script/extract.sh
+./script/extract.sh
 ```
