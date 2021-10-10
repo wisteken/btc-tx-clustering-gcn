@@ -26,7 +26,7 @@ torch.backends.cudnn.deterministic = True
 random.seed(seed)
 
 n_features = 10
-n_classes = 3
+n_classes = 2
 
 
 def train():

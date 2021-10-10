@@ -2,7 +2,10 @@ version: '3'
 
 services:
   python:
+    container_name: 'python'
     build: ./docker
-  volumes:
-    ./:/work
-
+    volumes:
+      - ./:/work
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    tty: true
