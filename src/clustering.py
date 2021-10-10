@@ -96,7 +96,7 @@ def test():
     z_selected = TSNE(n_components=2, random_state=seed).fit_transform(z_selected)
 
     colors = [
-        '#bada55', '#008080', '#065535', '#ffd700', '#ffc0cb', '#420420', '#7fe5f0'
+        '#bada55', '#008080', '#ffd700', '#ffc0cb', '#420420'
     ]
     y_selected = y[selected_idx]
     plt.figure(figsize=(8, 8))
@@ -104,6 +104,7 @@ def test():
         plt.scatter(z_selected[y_selected == i, 0], z_selected[y_selected == i, 1], s=20, color=colors[i])
     plt.axis('off')
     plt.savefig('../results/plot.pdf', bbox_inches='tight', transparent=True)
+    plt.savefig('../results/plot.png', bbox_inches='tight')
 
     x, _ = load_data(is_normalized=False)
     pd.DataFrame(np.concatenate([x, y.reshape(-1, 1)], 1)).to_csv('../results/predicted.csv')
